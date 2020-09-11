@@ -94,12 +94,21 @@ ssize_t redisNetWrite(redisContext *c) {
 
 static void __redisSetErrorFromErrno(redisContext *c, int type, const char *prefix) {
     int errorno = errno;  /* snprintf() may change errno */
-    char buf[128] = { 0 };
-    size_t len = 0;
+    char buf[256] = { 0 };
+    size_t len = 0, max = sizeof(buf)-1;
 
     if (prefix != NULL)
         len = snprintf(buf,sizeof(buf),"%s: ",prefix);
+
+#ifdef _WIN32
+    if (!FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, 0, errorno,
+                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // default language
+                        buf + len, (DWORD)max - len, NULL))
+        snprintf(buf + len, max - len, "Unknown error %d (%#x)", errorno, errorno);
+#else
     strerror_r(errorno, (char *)(buf + len), sizeof(buf) - len);
+#endif
+
     __redisSetError(c,type,buf);
 }
 
